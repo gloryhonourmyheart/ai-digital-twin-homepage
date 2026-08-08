@@ -2,40 +2,26 @@
 const PROXY_URL = "";
 const API_ENDPOINT = PROXY_URL || "/api/chat";
 
-// ============ 数字分身人设 ============
-const BOT_PERSONA = `你是以琛的数字分身，性格亲切、自然、有点小幽默，像朋友一样聊天。
-以下是关于以琛的信息，回答时可以灵活引用：
+// ============ 数字分身人设（唯一真源：docs/boundary-cleanup.md）============
+// 启动时从说明书读取全文作为 system prompt；fetch 失败时用下面的降级人设保证可用。
+// 修改人设请编辑 docs/boundary-cleanup.md，无需改代码。
+let BOT_PERSONA = `你是以琛的数字分身。肖以琛，03 年全栈开发工程师，正在学习用 AI 做产品。亲切自然地用中文回答，像朋友聊天；不确定就说不知道，不编造经历。邮箱 3205553113@qq.com，GitHub: gloryhonourmyheart。`;
 
-【基本信息】
-- 名字：肖以琛
-- 身份：03 年的全栈开发工程师
-- 正在学习用 AI 做产品
-
-【最近在做】
-- 搭自己的个人主页
-- 整理作品集和项目方向
-- 寻找值得 5-10 年深耕的领域
-
-【兴趣】
-AI 应用、天文、音乐、哲学、放空、猫猫狗狗、写作、旅行
-
-【擅长/关心的方向】
-AI 应用、知识整理、内容表达
-
-【性格特点】
-喜欢天南海北、随心所欲地畅聊
-
-【联系方式】
-- 邮箱：3205553113@qq.com
-- GitHub：https://github.com/gloryhonourmyheart
-
-【回答风格】
-- 用中文回答
-- 语气亲切自然，像朋友聊天，不要太官方
-- 适当使用 emoji，但不要过多
-- 如果被问到作品集，老实说正在整理中
-- 如果不确定的问题，坦诚说"这个我不太确定，不过你可以直接问以琛本人～"
-- 回答要简洁有温度，不要太长`;
+let personaLoaded = false;
+async function loadPersona() {
+  try {
+    const res = await fetch("/docs/boundary-cleanup.md", { cache: "no-store" });
+    if (res.ok) {
+      BOT_PERSONA = await res.text();
+    } else {
+      console.warn("人设说明书加载失败：HTTP", res.status, "，使用降级人设");
+    }
+  } catch (e) {
+    console.warn("人设说明书加载失败，使用降级人设：", e);
+  } finally {
+    personaLoaded = true;
+  }
+}
 
 // ============ 本地知识库（降级方案） ============
 const KNOWLEDGE = [
@@ -336,6 +322,7 @@ function localAnswer(question) {
 function isLLMConfigured() { return !!API_ENDPOINT; }
 
 async function callLLM(question, history) {
+  if (!personaLoaded) await loadPersona();
   const messages = [
     { role: "system", content: BOT_PERSONA },
     ...history,
@@ -441,5 +428,6 @@ document.getElementById("quick-asks").addEventListener("click", (e) => {
 window.addEventListener("DOMContentLoaded", () => {
   updateClock();
   setInterval(updateClock, 30_000);
+  loadPersona(); // 后台预加载人设说明书，不阻塞欢迎语
   setTimeout(() => typeWriter(WELCOME), 400);
 });
